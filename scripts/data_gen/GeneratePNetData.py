@@ -122,6 +122,9 @@ with open(anno_file, "r") as f:
         # 读取真值 bbox
         H, W, C = img.shape
         gt_bbox = []
+        if face_num==0:
+            line = f.readline()
+            continue
         for i in range(face_num):
             line = f.readline()
             line = line.split()

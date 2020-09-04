@@ -107,7 +107,9 @@ def GenerateData(mt):
             face_num = f.readline()
             face_num = int(face_num)
 
-
+            if face_num==0:
+                line = f.readline()
+                continue
             # 读取真值 bbox
             gt_bbox = []
             for i in range(face_num):
