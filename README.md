@@ -78,7 +78,7 @@ c++ 模型文件在 `${REPO}/cpp`目录下
 
 编辑GenerateRONetData.py中的net_type及 Pnet和rnet的网络权重路径，将onet置为None。
 
-`~/anaconda3/bin/python data_gen/GenerateRONetData.py `
+`~/anaconda3/bin/python data_gen/GenerateRONetData.py `  
 `~/anaconda3/bin/python data_gen/GenerateRONetLandmarkData.py `
 
 6， 训练 onet 
