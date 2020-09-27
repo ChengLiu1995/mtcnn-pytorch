@@ -172,7 +172,7 @@ def AddClsAccuracy(pred, targets):
 def AddLandmarkLoss(pred, targets):
     label = targets[:, -1].long()
     landmark = targets[:, 4:-1]
-    # pred: N * 4 * 1 * 1
+    # pred: N * 10 * 1 * 1
     idx = label < 0
     landmark_use = landmark[idx]
     pred_use = pred[idx]
