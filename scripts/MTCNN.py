@@ -10,7 +10,7 @@ from Nets import *
 from pylab import plt
 from util.utility import pad_bbox, square_bbox, py_nms
 
-SHOW_FIGURE = False
+SHOW_FIGURE = True
 
 def Image2Tensor(img, MEANS):
     src = img.astype(np.float32) - np.array(MEANS, dtype=np.float32)
@@ -111,7 +111,7 @@ class MTCNN(object):
             input = input.to(self.device)
             self.pnet.eval()
             with torch.no_grad():
-                output_cls, output_reg = self.pnet(input)
+                output_cls, output_reg, _ = self.pnet(input)
             output_cls = output_cls.squeeze_(0).detach().cpu().numpy()
             output_reg = output_reg.squeeze_(0).detach().cpu().numpy()
 
@@ -208,9 +208,13 @@ class MTCNN(object):
             crop = np.zeros((size, size, 3), dtype=np.uint8)
             if sx0 < 0 or sy0 < 0 or dx0 < 0 or dy0 < 0 or sx1 > W or sy1 > H or dx1 > size or dy1 > size:
                 continue
+            if sx0 > W or sy0 > H or dx0 > size or dy0 > size or sx1 < 0 or sy1 < 0 or dx1 < 0 or dy1 < 0:
+                continue
             crop[dy0:dy1, dx0:dx1, :] = img[sy0:sy1, sx0:sx1, :]
             out = cv2.resize(crop, (IMAGE_SIZE, IMAGE_SIZE))
             out = out.astype(np.float32) - np.array([127.5,127.5,127.5], dtype=np.float32)
+            if IMAGE_SIZE == 48:
+                out = out / 128
             out = out.swapaxes(1, 2).swapaxes(0, 1)
             crops += [out]
             origin_bbox += [i]
@@ -233,7 +237,7 @@ class MTCNN(object):
         ## out[1] -> N * 4
         cls_map = out[0].detach().cpu().numpy()
         reg = out[1].detach().cpu().numpy()
-
+        landmark = out[2].detach().cpu().numpy()
         face_map = cls_map[:, 1]
         t_index = np.where(face_map > threshold)
         if t_index[0].shape[0] <= 0:
@@ -243,7 +247,7 @@ class MTCNN(object):
         origin_bbox = origin_bbox[t_index]
         score = face_map[t_index]
         reg_map = reg[t_index]
-
+        landmark_map = landmark[t_index]
         dx = reg_map[:, 0]
         dy = reg_map[:, 1]
         dw = reg_map[:, 2]
@@ -254,20 +258,25 @@ class MTCNN(object):
         dy *= IMAGE_SIZE
         dw = np.exp(dw) * IMAGE_SIZE
         dh = np.exp(dh) * IMAGE_SIZE
-
+        landmark_map *= IMAGE_SIZE
         # add Gx AND Gy
         G = origin_bbox
         G = G.astype(np.float32)
-
         dx = dx / (float(IMAGE_SIZE) / G[:, 2]) + G[:, 0]
         dy = dy / (float(IMAGE_SIZE) / G[:, 3]) + G[:, 1]
         dw = dw / (float(IMAGE_SIZE) / G[:, 2])
         dh = dh / (float(IMAGE_SIZE) / G[:, 3])
-
+        for i in range(5):
+            landmark_map[:,i*2] = landmark_map[:,i*2] / (float(IMAGE_SIZE) / G[:, 2]) + G[:, 0]
+            landmark_map[:,1+i*2] = landmark_map[:,1+i*2] / (float(IMAGE_SIZE) / G[:, 3]) + G[:, 1]
+        #landmark_map = landmark_map / 
         # compose
+        #print("dx",dx)
+        #print(landmark_map)
         bbox = np.vstack([dx, dy, dw, dh, score])
         bbox = bbox.T
-
+        #landmark_map = landmark_map.T
+        bbox = np.hstack([bbox,landmark_map])
         # do nms
         if image_size == 24:
             keep = py_nms(bbox, 0.6, "Union")
@@ -296,52 +305,57 @@ if __name__ == "__main__":
     os.environ["CUDA_VISIBLE_DEVICES"] = ",".join([str(i) for i in GPU_ID])
     device = torch.device("cuda:0" if torch.cuda.is_available() and USE_CUDA else "cpu")
     # pnet
-    pnet_weight_path = "./models/pnet_20181218_final.pkl"
+    pnet_weight_path = "./models/pnet_20200917_final.pkl"
     pnet = PNet(test=True)
     LoadWeights(pnet_weight_path, pnet)
     pnet.to(device)
 
     # rnet
-    rnet_weight_path = "./models/rnet_20181218_final.pkl"
+    rnet_weight_path = "./models/rnet_20200917_final.pkl"
     rnet = RNet(test=True)
     LoadWeights(rnet_weight_path, rnet)
     rnet.to(device)
 
     # onet
-    onet_weight_path = "./models/onet_20181218_2_final.pkl"
+    onet_weight_path = "./models/onet_20200925_dp_3113_adam_final.pkl"
     onet = ONet(test=True)
     LoadWeights(onet_weight_path, onet)
     onet.to(device)
 
-    mtcnn = MTCNN(detectors=[pnet, rnet, onet], device=device, threshold=[0.6, 0.7, 0.7])
+    mtcnn = MTCNN(detectors=[pnet, rnet, onet], device=device, threshold=[0.6, 0.7, 0.6])
 
+    #img_path = "~/dataset/faces3.jpg"
+    #img_path = "~/dataset/WIDER_FACE/WIDER_train/images/14--Traffic/14_Traffic_Traffic_14_545.jpg"
+    img_path = "../img/faces1.jpg"
 
-    #
-    # img_path = "~/dataset/faces3.jpg"
-    # # img_path = "~/dataset/WIDER_FACE/WIDER_train/images/14--Traffic/14_Traffic_Traffic_14_545.jpg"
-    # # img_path = "~/dataset/WIDER_FACE/WIDER_val/images/14--Traffic/14_Traffic_Traffic_14_380.jpg"
-    # img_path = os.path.expanduser(img_path)
-    #
-    # img =cv2.imread(img_path)
-    # b = time.time()
-    # bboxes = mtcnn.detect(img)
-    # e = time.time()
-    # print("time cost: {} ms".format((e-b) * 1000.0))
-    #
-    # if SHOW_FIGURE:
-    #     if bboxes is not None:
-    #         plt.figure()
-    #         tmp = img.copy()
-    #         for i in bboxes:
-    #             x0 = int(i[0])
-    #             y0 = int(i[1])
-    #             x1 = x0 + int(i[2])
-    #             y1 = y0 + int(i[3])
-    #             cv2.rectangle(tmp, (x0, y0), (x1, y1), (0, 0, 255), 2)
-    #         plt.imshow(tmp[:, :, ::-1])
-    #         plt.title("result")
-    #     plt.show()
+    img_path = os.path.expanduser(img_path)
 
+    img =cv2.imread(img_path)
+    b = time.time()
+    bboxes = mtcnn.detect(img)
+    e = time.time()
+    print("time cost: {} ms".format((e-b) * 1000.0))
+    if SHOW_FIGURE:
+        if bboxes is not None:
+            plt.figure()
+            tmp = img.copy()
+            for i in bboxes:
+                print(i)
+                x0 = int(i[0])
+                y0 = int(i[1])
+                x1 = x0 + int(i[2])
+                y1 = y0 + int(i[3])
+                cv2.rectangle(tmp, (x0, y0), (x1, y1), (0, 0, 255), 2)
+                for ii in range(5):
+                    x = int(i[5+ii*2])
+                    y = int(i[5+ii*2+1])
+                    cv2.circle(tmp,(x ,y), 3, (0,0,255),-1) 
+            plt.imshow(tmp[:, :, ::-1])
+            plt.title("result")
+            #cv2.imwrite("../img/res1_lmk.jpg",tmp)
+        plt.show()
+
+    '''
     fp = "~/dataset/GC_FACE_VAL"
     fp = os.path.expanduser(fp)
     txt = "file_list.txt"
@@ -374,7 +388,7 @@ if __name__ == "__main__":
     f.close()
     print("done")
 
-
+'''
 
 
 
