@@ -57,6 +57,7 @@ c++ 模型文件在 `${REPO}/cpp`目录下
 1. 制作pnet 样本：
 
 `~/anaconda3/bin/python data_gen/GeneratePNetData.py `
+`~/anaconda3/bin/python data_gen/GeneratePNetLandmarkData.py `
 
 2. 训练pnet：
 
@@ -66,6 +67,8 @@ c++ 模型文件在 `${REPO}/cpp`目录下
 编辑GenerateRONetData.py中的net_type及 Pnet的网络权重路径，将rnet和onet置为None。
 
 `~/anaconda3/bin/python data_gen/GenerateRONetData.py `
+`~/anaconda3/bin/python data_gen/GenerateRONetLandmarkData.py `
+
 
 4. 训练 rnet 
 
@@ -76,6 +79,7 @@ c++ 模型文件在 `${REPO}/cpp`目录下
 编辑GenerateRONetData.py中的net_type及 Pnet和rnet的网络权重路径，将onet置为None。
 
 `~/anaconda3/bin/python data_gen/GenerateRONetData.py `
+`~/anaconda3/bin/python data_gen/GenerateRONetLandmarkData.py `
 
 6， 训练 onet 
 
