@@ -1,7 +1,8 @@
 # coding: utf-8
 import random
 import numpy as np
-
+from torchvision import transforms as tfs
+from PIL import Image
 def draw_line(img, line_num, line_width):
     h, w, _ = img.shape
     vlines = []
@@ -43,8 +44,28 @@ class RandomMirror(object):
             image = image[:, ::-1]
             target = target.copy()
             target[[0, 2]] = width - target[[2, 0]]
+            if len(target) > 5:
+                target[[4,6]] =  width - target[[6,4]]
+                target[[5,7]] = target[[7,5]]
+                target[8] = width - target[8]
+                target[[10,12]] =  width - target[[12,10]]
+                target[[11,13]] = target[[13,11]]
         return image, target
 
+class RandomColorJitter(object):
+    def __init__(self, p):
+        self.p = p
+    def __call__(self, image, target):
+        _, width, _ = image.shape
+        if random.random() < self.p:
+            image = Image.fromarray(np.uint8(image))
+            if random.random() < 0.5:
+                image = tfs.ColorJitter(brightness=random.random()*0.1 - 0.05 + 1)(image)
+            else:
+                image = tfs.ColorJitter(contrast=random.random()*0.1 - 0.05 + 1)(image)
+            image = np.asarray(image).astype(np.float32)
+            target = target.copy()
+        return image, target
 
 class ToPercentCoords(object):
     def __call__(self, image, target):
@@ -57,6 +78,10 @@ class ToPercentCoords(object):
         target[2] /= width
         target[1] /= height
         target[3] /= height
+        if len(target) > 5:
+            for i in range(5):
+                target[4+i*2] = target[4+i*2] / width
+                target[5+i*2] = target[5+i*2] / height
         # w,h to log
         target[2] = np.log(target[2])
         target[3] = np.log(target[3])
