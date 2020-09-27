@@ -10,7 +10,6 @@ class PNet(nn.Module):
     """
     pnet definition
     """
-
     def __init__(self, test=False):
         super(PNet, self).__init__()
         self.features = nn.Sequential(
@@ -37,6 +36,10 @@ class PNet(nn.Module):
             nn.Conv2d(32, 4, kernel_size=1, stride=1, padding=0)
         )
 
+        self.landmarkRegressioner = nn.Sequential(
+            nn.Conv2d(32, 10, kernel_size=1, stride=1, padding=0)
+        )
+
         self.test = test
         if test:
             self.softmax = nn.Softmax2d()
@@ -45,9 +48,10 @@ class PNet(nn.Module):
         y = self.features(data)
         cls = self.classifier(y)
         bbox = self.regressioner(y)
+        landmark = self.landmarkRegressioner(y)
         if self.test:
             cls = self.softmax(cls)
-        return cls, bbox
+        return cls, bbox, landmark
 
 
 class RNet(nn.Module):
@@ -73,9 +77,9 @@ class RNet(nn.Module):
 
         self.fc = nn.Linear(64 * 3 * 3, 128)
         self.relu = nn.PReLU()
-
         self.cls = nn.Linear(128, 2)
         self.reg = nn.Linear(128, 4)
+        self.lmk = nn.Linear(128, 10)
 
         if test:
             self.softmax = nn.Softmax(dim=1)
@@ -88,7 +92,8 @@ class RNet(nn.Module):
         reg = self.reg(x)
         if self.test:
             cls = self.softmax(cls)
-        return cls, reg
+        lmk = self.lmk(x)
+        return cls, reg, lmk
 
 class ONet(nn.Module):
     def __init__(self, test=False):
@@ -120,23 +125,28 @@ class ONet(nn.Module):
 
         self.cls = nn.Linear(256, 2)
         self.reg = nn.Linear(256, 4)
+        self.lmk = nn.Linear(256, 10)
 
     def forward(self, x):
         x = self.extractor(x)
         x = x.contiguous().view(x.size(0), -1)
-        x = self.relu(self.fc(x))
+        x = self.fc(x)
+        x = F.dropout(x,p=0.25,training = True)
+        x = self.relu(x)
         cls = self.cls(x)
         reg = self.reg(x)
         if self.test:
             cls = self.softmax(cls)
-        return cls, reg 
+        lmk = self.lmk(x)
+        return cls, reg, lmk
 
 
 
 def AddClsLoss(pred, targets, k):
     label = targets[:, -1].long()
     # pred: 5 * 2 * 1 * 1
-    idx = label < 2
+    #idx = label < 2
+    idx = (label < 2) & (label >= 0)
     label_use = label[idx]
     pred_use = pred[idx]
     pred_use = torch.squeeze(pred_use)
@@ -149,7 +159,7 @@ def AddClsLoss(pred, targets, k):
 
 def AddClsAccuracy(pred, targets):
     label = targets[:, -1].long()
-    idx = label < 2
+    idx = (label < 2) & (label >= 0)
     label_use = label[idx]
     pred_use = pred[idx]
     pred_s = torch.squeeze(pred_use)
@@ -159,12 +169,26 @@ def AddClsAccuracy(pred, targets):
     n = pred_use.size(0)
     return float(s.item()) / float(n)
 
+def AddLandmarkLoss(pred, targets):
+    label = targets[:, -1].long()
+    landmark = targets[:, 4:-1]
+    # pred: N * 4 * 1 * 1
+    idx = label < 0
+    landmark_use = landmark[idx]
+    pred_use = pred[idx]
+    pred_squeeze = torch.squeeze(pred_use)
+    #loss = F.mse_loss(pred_squeeze, landmark_use)
+    loss = F.smooth_l1_loss(pred_squeeze, landmark_use)
+    return loss
+    # return
+
 
 def AddRegLoss(pred, targets):
     label = targets[:, -1].long()
     bbox = targets[:, 0:4]
     # pred: N * 4 * 1 * 1
-    idx = label > 0
+    idx = (label > 0) | (label < 0)
+    #idx = (label > 0)
     bbox_use = bbox[idx]
     pred_use = pred[idx]
     pred_squeeze = torch.squeeze(pred_use)
@@ -178,7 +202,8 @@ def AddBoxMap(pred, target, image_width, image_height):
     label = target[:, -1].long()
     bbox = target[:, 0:4]
     # pred: N * 4 * 1 * 1
-    idx = label > 0
+    #idx = label > 0
+    idx = (label > 0) | (label < 0)
     bbox_use = bbox[idx]
     pred_use = pred[idx]
     pred_squeeze = torch.squeeze(pred_use)
