@@ -46,7 +46,7 @@ prefix = "r"
 save_dir = "./models"
 if not os.path.exists(save_dir):
     os.mkdir(save_dir)
-save_prefix = save_dir + "/{}net_20181218".format(prefix)
+save_prefix = save_dir + "/{}net_20200923".format(prefix)
 
 
 root_dir = r"../dataset/"
@@ -65,6 +65,9 @@ train_anno_path += [os.path.join(root_dir, "train_faces_{}/part/label_part".form
 
 train_anno_path += [os.path.join(root_dir, "train_faces_{}/neg/image_neg".format(prefix))]
 train_anno_path += [os.path.join(root_dir, "train_faces_{}/neg/label_neg".format(prefix))]
+
+train_anno_path += [os.path.join(root_dir, "train_faces_{}/landmark/image_landmark".format(prefix))]
+train_anno_path += [os.path.join(root_dir, "train_faces_{}/landmark/label_landmark".format(prefix))]
 
 
 def train():
@@ -106,11 +109,12 @@ def train():
 
         optimizer.zero_grad()
 
-        pred_cls, pred_bbox = net(images)
+        pred_cls, pred_bbox,pred_landmark = net(images)
 
         loss_cls = AddClsLoss(pred_cls, targets, topk)
         loss_reg = AddRegLoss(pred_bbox, targets)
-        loss = loss_cls + loss_reg
+        loss_landmark = AddLandmarkLoss(pred_landmark, targets)
+        loss = loss_cls + loss_reg + loss_landmark
 
         loss.backward()
         torch.nn.utils.clip_grad_norm_(net.parameters(), clip_grad)
@@ -122,8 +126,8 @@ def train():
             acc_cls = AddClsAccuracy(pred_cls, targets)
             acc_reg = AddBoxMap(pred_bbox, targets, INPUT_IMAGE_SIZE, INPUT_IMAGE_SIZE)
 
-            log.info("train iter: {}, lr: {}, loss: {:.4f}, cls loss: {:.4f}, bbox loss: {:.4f}, cls acc: {:.4f}, bbox acc: {:.4f}".format(
-                k, optimizer.param_groups[0]['lr'], loss.item(), loss_cls.item(), loss_reg.item(), acc_cls, acc_reg))
+            log.info("train iter: {}, lr: {}, loss: {:.4f}, cls loss: {:.4f}, bbox loss: {:.4f}, landmark loss:{:.4f}, cls acc: {:.4f}, bbox acc: {:.4f}".format(
+                k, optimizer.param_groups[0]['lr'], loss.item(), loss_cls.item(), loss_reg.item(),loss_landmark.item(), acc_cls, acc_reg))
 
         if k % save_interval == 0:
             path = save_prefix + "_iter_{}.pkl".format(k)

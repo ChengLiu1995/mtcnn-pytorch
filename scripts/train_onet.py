@@ -21,7 +21,7 @@ log = Logger("./log/{}_{}.log".format(__file__.split('/')[-1],
                                              time.strftime("%Y%m%d-%H%M%S"), time.localtime), level='debug').logger
 
 USE_CUDA = True
-GPU_ID = [0]
+GPU_ID = [1]
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = ",".join([str(i) for i in GPU_ID])
 device = torch.device("cuda" if torch.cuda.is_available() and USE_CUDA else "cpu")
@@ -29,13 +29,13 @@ device = torch.device("cuda" if torch.cuda.is_available() and USE_CUDA else "cpu
 pre_checkpoint = None
 resume = False
 
-train_batch = 400
+train_batch = 800
 display = 100
 
 base_lr = 0.001
 clip_grad = 120.0
 momentum = 0.9
-gamma = 0.1
+gamma = 0.5
 weight_decay = 0.0005
 stepsize = [30000, 50000, 60000, 70000]
 max_iter = 80000
@@ -46,7 +46,7 @@ prefix = "o"
 save_dir = "./models"
 if not os.path.exists(save_dir):
     os.mkdir(save_dir)
-save_prefix = save_dir + "/{}net_20181218".format(prefix)
+save_prefix = save_dir + "/{}net_20200925".format(prefix)
 
 
 root_dir = r"../dataset/"
@@ -66,19 +66,22 @@ train_anno_path += [os.path.join(root_dir, "train_faces_{}/part/label_part".form
 train_anno_path += [os.path.join(root_dir, "train_faces_{}/neg/image_neg".format(prefix))]
 train_anno_path += [os.path.join(root_dir, "train_faces_{}/neg/label_neg".format(prefix))]
 
+train_anno_path += [os.path.join(root_dir, "train_faces_{}/landmark/image_landmark".format(prefix))]
+train_anno_path += [os.path.join(root_dir, "train_faces_{}/landmark/label_landmark".format(prefix))]
 
 def train():
     start_epoch = 0
     # dataset
     train_dataset = DataSource(train_anno_path, transform=Compose([
-        RandomMirror(0.5), SubtractFloatMeans(MEANS), ToPercentCoords(), PermuteCHW()
-    ]), ratio=1, image_shape=(INPUT_IMAGE_SIZE,INPUT_IMAGE_SIZE,3))
+        RandomColorJitter(0.3), RandomMirror(0.5), SubtractFloatMeans(MEANS), ToPercentCoords(), PermuteCHW()
+    ]), ratio=3, image_shape=(INPUT_IMAGE_SIZE,INPUT_IMAGE_SIZE,3))
 
     # net
     net = ONet()
 
     # optimizer and scheduler
-    optimizer = optim.SGD(net.parameters(), lr=base_lr, momentum=momentum, weight_decay=weight_decay)
+    #optimizer = optim.SGD(net.parameters(), lr=base_lr, momentum=momentum, weight_decay=weight_decay)
+    optimizer = optim.Adam(net.parameters(), lr=base_lr,betas=(0.9, 0.999),eps=1e-08, weight_decay=weight_decay)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, stepsize, gamma)
 
     # device
@@ -106,12 +109,14 @@ def train():
 
         optimizer.zero_grad()
 
-        pred_cls, pred_bbox = net(images)
+        pred_cls, pred_bbox, pred_landmark = net(images)
 
         loss_cls = AddClsLoss(pred_cls, targets, topk)
         loss_reg = AddRegLoss(pred_bbox, targets)
-        loss = loss_cls + loss_reg * 3
-
+        loss_landmark = AddLandmarkLoss(pred_landmark, targets)
+        
+        loss = loss_cls * 2 + loss_reg *1 + loss_landmark * 2
+        #loss = loss_landmark
         loss.backward()
         torch.nn.utils.clip_grad_norm_(net.parameters(), clip_grad)
 
@@ -122,8 +127,8 @@ def train():
             acc_cls = AddClsAccuracy(pred_cls, targets)
             acc_reg = AddBoxMap(pred_bbox, targets, INPUT_IMAGE_SIZE, INPUT_IMAGE_SIZE)
 
-            log.info("train iter: {}, lr: {}, loss: {:.4f}, cls loss: {:.4f}, bbox loss: {:.4f}, cls acc: {:.4f}, bbox acc: {:.4f}".format(
-                k, optimizer.param_groups[0]['lr'], loss.item(), loss_cls.item(), loss_reg.item(), acc_cls, acc_reg))
+            log.info("train iter: {}, lr: {}, loss: {:.4f}, cls loss: {:.4f}, bbox loss: {:.4f}, landmark loss:{:.4f}, cls acc: {:.4f}, bbox acc: {:.4f}".format(
+                k, optimizer.param_groups[0]['lr'], loss.item(), loss_cls.item(), loss_reg.item(), loss_landmark.item(), acc_cls, acc_reg))
 
         if k % save_interval == 0:
             path = save_prefix + "_iter_{}.pkl".format(k)
