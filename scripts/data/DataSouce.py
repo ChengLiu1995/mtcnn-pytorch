@@ -18,9 +18,11 @@ class DataSource(data.Dataset):
         self.pos = []
         self.part = []
         self.neg = []
+        self.landmark = []
         self.pos_idx = 0
         self.part_idx = 0
         self.neg_idx = 0
+        self.landmark_idx = 0
 
         # pos
         self.pos_env_image = lmdb.open(data_file[0],
@@ -45,18 +47,26 @@ class DataSource(data.Dataset):
             self.neg = [key for key, _ in txn.cursor()]
         self.neg_env_label = lmdb.open(data_file[5],
                                        max_readers=1, readonly=True, lock=False, readahead=False, meminit=False)
+        # landmark
+        self.landmark_env_image = lmdb.open(data_file[6],
+                                       max_readers=1, readonly=True, lock=False, readahead=False, meminit=False)
+        with self.landmark_env_image.begin(write=False) as txn:
+            self.landmark = [key for key, _ in txn.cursor()]
+        self.landmark_env_label = lmdb.open(data_file[7],
+                                       max_readers=1, readonly=True, lock=False, readahead=False, meminit=False)
 
         if shuffle:
             random.shuffle(self.pos)
             random.shuffle(self.part)
             random.shuffle(self.neg)
+            random.shuffle(self.landmark)
 
     def prepare_batch_sample(self, batch_size):
         # 0，分割样本个数
-        neg_num = batch_size // (self.ratio + 2) * self.ratio
-        part_num = batch_size // (self.ratio + 2)
-        pos_num = batch_size - neg_num - part_num
-
+        neg_num = batch_size // (self.ratio + 4) * self.ratio
+        part_num = batch_size // (self.ratio + 5)
+        landmark_num = batch_size // (self.ratio + 5) * 3
+        pos_num = batch_size - neg_num - part_num - landmark_num
         # neg
         neg_anno = []
         out_neg_idx = 0
@@ -99,10 +109,25 @@ class DataSource(data.Dataset):
             part_anno = self.part[self.part_idx: self.part_idx + part_num]
             self.part_idx += part_num
 
+        # landmark
+        landmark_anno = []
+        out_landmark_idx = 0
+        if self.landmark_idx + landmark_num > len(self.landmark):
+            landmark_anno = self.landmark[self.landmark_idx:]
+            out_landmark_idx = landmark_num - len(landmark_anno)
+            landmark_anno.extend(self.landmark[0:out_landmark_idx])
+            self.landmark_idx = out_landmark_idx
+            if self.shuffle:
+                random.shuffle(self.landmark)
+        else:
+            landmark_anno = self.landmark[self.landmark_idx: self.landmark_idx + landmark_num]
+            self.landmark_idx += landmark_num
+
         # out
         batch_anno = [(i, "0") for i in neg_anno]
         batch_anno.extend([(i, "1") for i in pos_anno])
         batch_anno.extend([(i, "2") for i in part_anno])
+        batch_anno.extend([(i, "-1") for i in landmark_anno])
         random.shuffle(batch_anno)
         return batch_anno
 
@@ -119,6 +144,11 @@ class DataSource(data.Dataset):
             with self.pos_env_image.begin(write=False) as txn:
                 img = txn.get(line[0])
             with self.pos_env_label.begin(write=False) as txn:
+                target = txn.get(line[0])
+        elif line[1] == "-1":
+            with self.landmark_env_image.begin(write=False) as txn:
+                img = txn.get(line[0])
+            with self.landmark_env_label.begin(write=False) as txn:
                 target = txn.get(line[0])
         else:
             with self.part_env_image.begin(write=False) as txn:
@@ -142,9 +172,11 @@ class DataSource(data.Dataset):
         for sample in batch_anno:
             img, target = self.get_sample(sample)
             imgs += [img]
+            if len(target) < 6:
+                for i in range(10):
+                    target = np.insert(target, 4, 0)
             targets += [target]
 
         imgs = np.array(imgs)
         targets = np.array(targets).astype(np.float32)
-
         return torch.from_numpy(imgs), torch.from_numpy(targets)
