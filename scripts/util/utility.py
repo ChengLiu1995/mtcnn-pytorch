@@ -4,8 +4,6 @@
 """
 import numpy as np
 
-
-
 def IntersectBBox(bbox1, bbox2):
     if (bbox2[0] > bbox1[0] + bbox1[2] or bbox2[0] + bbox2[2] < bbox1[0] or
             bbox2[1] > bbox1[1] + bbox1[3] or bbox2[1] + bbox2[3] < bbox1[1]):
@@ -67,6 +65,19 @@ def square_bbox(bbox):
     sq[1] = bbox[1] + h * 0.5 - max_size * 0.5
     sq[2] = max_size
     sq[3] = max_size
+    return sq
+
+def boder_bbox(bbox, border = 10):
+    """
+    把bbox，向两边扩充（以bbox的中心为中心）
+    :param bbox:
+    :return:
+    """
+    sq = bbox.copy()
+    sq[0] = sq[0] - border
+    sq[1] = sq[1] - border
+    sq[2] = sq[2] + border * 2
+    sq[3] = sq[3] + border * 2
     return sq
 
 def pad_bbox(bbox, W, H):
