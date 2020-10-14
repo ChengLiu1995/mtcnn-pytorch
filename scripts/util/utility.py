@@ -15,6 +15,20 @@ def IntersectBBox(bbox1, bbox2):
     h = np.min((bbox1[1] + bbox1[3], bbox2[1] + bbox2[3])) - y + 1
     return x, y, w, h
 
+def IOU_lmk(bbox1, bbox2):
+    bbox2 = bbox2.copy()
+    bbox2[1] = bbox2[1] - bbox2[3] * 0.2
+    bbox2[3] = bbox2[3] * 1.3
+    bbox2[0] = bbox2[0] - bbox2[2] * 0.05
+    bbox2[2] = bbox2[2] * 1.1
+    intersect_bbox = IntersectBBox(bbox1, bbox2)
+    if intersect_bbox[2] <= 0 or intersect_bbox[3] <= 0:
+        return 0.0
+    #
+    area_intersect = intersect_bbox[2] * intersect_bbox[3]
+    area_bbox1 = bbox1[2] * bbox1[3]
+    area_bbox2 = bbox2[2] * bbox2[3]
+    return float(area_intersect) / float(area_bbox1 + area_bbox2 - area_intersect)
 
 def IOM(bbox1, bbox2):
     intersect_bbox = IntersectBBox(bbox1, bbox2)
