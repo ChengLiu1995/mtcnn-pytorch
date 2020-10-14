@@ -21,7 +21,7 @@ log = Logger("./log/{}_{}.log".format(__file__.split('/')[-1],
                                              time.strftime("%Y%m%d-%H%M%S"), time.localtime), level='debug').logger
 
 USE_CUDA = True
-GPU_ID = [1]
+GPU_ID = [0]
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = ",".join([str(i) for i in GPU_ID])
 device = torch.device("cuda" if torch.cuda.is_available() and USE_CUDA else "cpu")
@@ -29,13 +29,13 @@ device = torch.device("cuda" if torch.cuda.is_available() and USE_CUDA else "cpu
 pre_checkpoint = None
 resume = False
 
-train_batch = 800
+train_batch = 700
 display = 100
 
 base_lr = 0.001
 clip_grad = 120.0
 momentum = 0.9
-gamma = 0.5
+gamma = 0.1
 weight_decay = 0.0005
 stepsize = [30000, 50000, 60000, 70000]
 max_iter = 80000
@@ -46,7 +46,7 @@ prefix = "o"
 save_dir = "./models"
 if not os.path.exists(save_dir):
     os.mkdir(save_dir)
-save_prefix = save_dir + "/{}net_20200925".format(prefix)
+save_prefix = save_dir + "/{}net_20201013".format(prefix)
 
 
 root_dir = r"../dataset/"

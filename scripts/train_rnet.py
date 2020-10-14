@@ -29,7 +29,7 @@ device = torch.device("cuda" if torch.cuda.is_available() and USE_CUDA else "cpu
 pre_checkpoint = None
 resume = False
 
-train_batch = 400
+train_batch = 700
 display = 100
 
 base_lr = 0.001
@@ -46,7 +46,7 @@ prefix = "r"
 save_dir = "./models"
 if not os.path.exists(save_dir):
     os.mkdir(save_dir)
-save_prefix = save_dir + "/{}net_20200923".format(prefix)
+save_prefix = save_dir + "/{}net_20201014".format(prefix)
 
 
 root_dir = r"../dataset/"
@@ -74,14 +74,15 @@ def train():
     start_epoch = 0
     # dataset
     train_dataset = DataSource(train_anno_path, transform=Compose([
-        RandomMirror(0.5), SubtractFloatMeans(MEANS), ToPercentCoords(), PermuteCHW()
-    ]), ratio=2, image_shape=(24,24,3))
+        RandomColorJitter(0.3),RandomMirror(0.5), SubtractFloatMeans(MEANS), ToPercentCoords(), PermuteCHW()
+    ]), ratio=3, image_shape=(24,24,3))
 
     # net
     net = RNet()
 
     # optimizer and scheduler
-    optimizer = optim.SGD(net.parameters(), lr=base_lr, momentum=momentum, weight_decay=weight_decay)
+    #optimizer = optim.SGD(net.parameters(), lr=base_lr, momentum=momentum, weight_decay=weight_decay)
+    optimizer = optim.Adam(net.parameters(), lr=base_lr,betas=(0.9, 0.999),eps=1e-08, weight_decay=weight_decay)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, stepsize, gamma)
 
     # device
@@ -114,7 +115,7 @@ def train():
         loss_cls = AddClsLoss(pred_cls, targets, topk)
         loss_reg = AddRegLoss(pred_bbox, targets)
         loss_landmark = AddLandmarkLoss(pred_landmark, targets)
-        loss = loss_cls + loss_reg + loss_landmark
+        loss =loss_cls + loss_reg + 0.5 * loss_landmark
 
         loss.backward()
         torch.nn.utils.clip_grad_norm_(net.parameters(), clip_grad)

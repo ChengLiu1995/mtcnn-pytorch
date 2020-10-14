@@ -21,7 +21,7 @@ log = Logger("./log/{}_{}.log".format(__file__.split('/')[-1],
                                              time.strftime("%Y%m%d-%H%M%S"), time.localtime), level='debug').logger
 
 USE_CUDA = True
-GPU_ID = [0]
+GPU_ID = [1]
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = ",".join([str(i) for i in GPU_ID])
 device = torch.device("cuda" if torch.cuda.is_available() and USE_CUDA else "cpu")
@@ -46,7 +46,7 @@ prefix = "p"
 save_dir = "./models"
 if not os.path.exists(save_dir):
     os.mkdir(save_dir)
-save_prefix = save_dir + "/{}net_20200917".format(prefix)
+save_prefix = save_dir + "/{}net_20201009".format(prefix)
 
 
 root_dir = r"../dataset/"
@@ -73,14 +73,15 @@ def train():
     start_epoch = 0
     # dataset
     train_dataset = DataSource(train_anno_path, transform=Compose([
-        RandomMirror(0.5), SubtractFloatMeans(MEANS), ToPercentCoords(), PermuteCHW()
-    ]), ratio=8)
+        RandomColorJitter(0.3),RandomMirror(0.5), SubtractFloatMeans(MEANS), ToPercentCoords(), PermuteCHW()
+    ]), ratio=3)
 
     # net
     net = PNet()
 
     # optimizer and scheduler
-    optimizer = optim.SGD(net.parameters(), lr=base_lr, momentum=momentum, weight_decay=weight_decay)
+    #optimizer = optim.SGD(net.parameters(), lr=base_lr, momentum=momentum, weight_decay=weight_decay)
+    optimizer = optim.Adam(net.parameters(), lr=base_lr,betas=(0.9, 0.999),eps=1e-08, weight_decay=weight_decay)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, stepsize, gamma)
 
     # device
@@ -113,7 +114,7 @@ def train():
         loss_cls = AddClsLoss(pred_cls, targets, topk)
         loss_reg = AddRegLoss(pred_bbox, targets)
         loss_landmark = AddLandmarkLoss(pred_landmark, targets)
-        loss = 3 * loss_cls + loss_reg + loss_landmark
+        loss = 2 * loss_cls + 2 * loss_reg + loss_landmark
 
         loss.backward()
         torch.nn.utils.clip_grad_norm_(net.parameters(), clip_grad)
