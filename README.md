@@ -12,7 +12,7 @@ mtcnn实现了由粗到精的人脸检测框架，具有承上启下的意义。
 
 mtcnn分为三个网络，网络模型都很小。原版论文里面的多任务有人脸检测、人脸目标框回归及人脸关键点回归。
 
-这里做了简化，只做了人脸检测和人脸目标框回归。
+这里做了做了人脸检测和人脸目标框及人脸关键点回归, 但是数据集不同（尤其是landmark数据不够好导致关键点回归不是特别准确）。
 
 在实现过程中，参考了：[MTCNN_face_detection_alignment](https://github.com/kpzhang93/MTCNN_face_detection_alignment)和[MTCNN-Tensorflow](https://github.com/AITTSMD/MTCNN-Tensorflow)
 
@@ -27,9 +27,17 @@ wider_face_split
 WIDER_train
 WIDER_val
 ```
-2. python3(anaconda)
-3. pytorchv1.0.0, lmdb, opencv, numpy, pylab
-4. (c++) cmake, opencv 
+
+2. lfw_5590 net_7876 `~/dataset/LFW_NET_FACE`目录下，该目录下的目录为：
+```
+lfw_5590
+net_7876
+testImageList.txt
+trainImageList.txt
+```
+3. python3(anaconda)
+4. pytorchv1.0.0, lmdb, opencv, numpy, pylab
+5. (c++) cmake, opencv 
 
 #### 测试
 python模型文件在 `${REPO}/scripts/models`目录下
