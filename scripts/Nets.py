@@ -178,7 +178,11 @@ def AddLandmarkLoss(pred, targets):
     pred_use = pred[idx]
     pred_squeeze = torch.squeeze(pred_use)
     #loss = F.mse_loss(pred_squeeze, landmark_use)
-    loss = F.smooth_l1_loss(pred_squeeze, landmark_use)
+    loss = F.smooth_l1_loss(pred_squeeze, landmark_use, reduction='none')
+    loss = torch.mean(loss,1)
+    topk = int(0.7 * loss.size(0))
+    loss, _ = torch.topk(loss, topk)
+    loss = torch.mean(loss)
     return loss
     # return
 
@@ -187,13 +191,17 @@ def AddRegLoss(pred, targets):
     label = targets[:, -1].long()
     bbox = targets[:, 0:4]
     # pred: N * 4 * 1 * 1
-    idx = (label > 0) | (label < 0)
+    idx = (label > 0)
     #idx = (label > 0)
     bbox_use = bbox[idx]
     pred_use = pred[idx]
     pred_squeeze = torch.squeeze(pred_use)
     # loss = F.mse_loss(pred_squeeze, bbox_use)
-    loss = F.smooth_l1_loss(pred_squeeze, bbox_use)
+    loss = F.smooth_l1_loss(pred_squeeze, bbox_use, reduction='none')
+    loss = torch.mean(loss,1)
+    topk = int(0.7 * loss.size(0))
+    loss, _ = torch.topk(loss, topk)
+    loss = torch.mean(loss)
     return loss
     # return
 
