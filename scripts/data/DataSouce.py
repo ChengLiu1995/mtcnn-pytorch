@@ -64,8 +64,8 @@ class DataSource(data.Dataset):
     def prepare_batch_sample(self, batch_size):
         # 0，分割样本个数
         neg_num = batch_size // (self.ratio + 4) * self.ratio
-        part_num = batch_size // (self.ratio + 5)
-        landmark_num = batch_size // (self.ratio + 5) * 3
+        part_num = batch_size // (self.ratio + 4)
+        landmark_num = batch_size // (self.ratio + 4) * 2
         pos_num = batch_size - neg_num - part_num - landmark_num
         # neg
         neg_anno = []

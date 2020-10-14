@@ -95,6 +95,7 @@ class SubtractFloatMeans(object):
     def __call__(self, image, targets):
         image = image.astype(np.float32)
         image -= self.mean
+        image = image / 128
         return image.astype(np.float32), targets
 
 class PermuteCHW(object):
