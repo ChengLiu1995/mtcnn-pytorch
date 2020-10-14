@@ -31,7 +31,7 @@ IOU_POS_THRES = 0.65
 IOU_NEG_THRES = 0.3
 IOU_PART_THRES = 0.4
 
-net_type = "ONET"
+net_type = "RNET"
 if net_type == "RNET":
     OUT_IMAGE_SIZE = 24
     post_fix = 'r'
@@ -48,10 +48,10 @@ val_dir = os.path.join(root_dir, 'WIDER_val/images')
 anno_dir = os.path.join(root_dir, 'wider_face_split')
 
 # path to output root dir
-output_root_dir = r"../../dataset/train_faces_test_{}".format(post_fix)
+output_root_dir = r"../../dataset/train_faces_{}".format(post_fix)
 if not os.path.exists(output_root_dir):
     os.mkdir(output_root_dir)
-
+print(output_root_dir)
 # output dirs: pos and neg
 output_pos_dir = os.path.join(output_root_dir, "pos")
 output_neg_dir = os.path.join(output_root_dir, "neg")
@@ -96,7 +96,6 @@ def GenerateData(mt):
     inner_neg_idx = 0
     inner_pos_idx = 0
     inner_part_idx = 0
-
     with open(anno_file, "r") as f:
         while True:
             filename = f.readline()
@@ -169,12 +168,17 @@ def GenerateData(mt):
 
                 # 负样本
                 if np.max(ious) < IOU_NEG_THRES:
+                    if random.random() < 0.8:
+                        continue
                     r = square_bbox(i)
                     # pad
                     size = r[2]
                     crop = np.zeros((size, size, 3), dtype=np.uint8)
                     sx0, sy0, sx1, sy1, dx0, dy0, dx1, dy1 = pad_bbox(r, W, H)
                     if sx0 < 0 or sy0 < 0 or dx0 < 0 or dy0 < 0 or sx1 > W or sy1 > H or dx1 > size or dy1 > size:
+                        log.warning("img shape is: {},{}".format(img.shape[0], img.shape[1]))
+                        continue
+                    if sx1 < 0 or sy1 < 0 or dx1 < 0 or dy1 < 0 or sx0 > W or sy0 > H or dx0 > size or dy0 > size:
                         log.warning("img shape is: {},{}".format(img.shape[0], img.shape[1]))
                         continue
                     crop[dy0:dy1, dx0:dx1, :] = img[sy0:sy1, sx0:sx1, :]
@@ -286,7 +290,7 @@ if __name__ == "__main__":
     os.environ["CUDA_VISIBLE_DEVICES"] = ",".join([str(i) for i in GPU_ID])
     device = torch.device("cuda:0" if torch.cuda.is_available() and USE_CUDA else "cpu")
     # pnet
-    pnet_weight_path = "../models/pnet_20200917_final.pkl"
+    pnet_weight_path = "../models/pnet_20201009_final.pkl"
     pnet = PNet(test=True)
     LoadWeights(pnet_weight_path, pnet)
     pnet.to(device)
@@ -294,7 +298,7 @@ if __name__ == "__main__":
     # rnet
     rnet = None
     if net_type == "ONET":
-        rnet_weight_path = "../models/rnet_20200917_final.pkl"
+        rnet_weight_path = "../models/rnet_20201012_iter_220000.pkl"
         rnet = RNet(test=True)
         LoadWeights(rnet_weight_path, rnet)
         rnet.to(device)

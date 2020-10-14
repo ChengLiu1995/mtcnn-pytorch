@@ -40,7 +40,7 @@ pos_samples = 20
 OUT_IMAGE_SIZE = 12
 
 # path to wider face'
-root_dir = r'~/dataset/WIDER_FACE'
+root_dir = r'../../dataset/WIDER_FACE'
 root_dir = os.path.expanduser(root_dir)
 
 train_dir = os.path.join(root_dir, 'WIDER_train/images')
@@ -48,7 +48,7 @@ val_dir = os.path.join(root_dir, 'WIDER_val/images')
 anno_dir = os.path.join(root_dir, 'wider_face_split')
 
 # path to output root dir
-output_root_dir = r"../dataset/train_faces_p"
+output_root_dir = r"../../dataset/train_faces_p"
 if not os.path.exists(output_root_dir):
     os.mkdir(output_root_dir)
 

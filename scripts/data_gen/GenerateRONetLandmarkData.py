@@ -24,7 +24,7 @@ if not os.path.exists("./log"):
 log = Logger("./log/{}_{}.log".format(__file__.split('/')[-1],
                                       time.strftime("%Y%m%d-%H%M%S"), time.localtime), level='debug').logger
 from MTCNN import *
-from util.utility import boder_bbox
+from util.utility import boder_bbox, IOU_lmk
 
 # 小于该人脸的就不要了
 MIN_FACE_SIZE = 40
@@ -35,7 +35,7 @@ IOU_PART_THRES = 0.4
 ## 关键点样本个数
 landmark_samples = 6
 
-net_type = "ONET"
+net_type = "RNET"
 if net_type == "RNET":
     OUT_IMAGE_SIZE = 24
     post_fix = 'r'
@@ -57,6 +57,7 @@ if not os.path.exists(output_landmark_dir):
 
 
 def GenerateData(mt):
+    not_reg_file = open('no_reg_lmk.txt', 'w')
     LMDB_MAP_SIZE = 1099511627776
     env_landmark_image = lmdb.open(os.path.join(output_landmark_dir, "image_landmark"), map_size=LMDB_MAP_SIZE)
     env_landmark_label = lmdb.open(os.path.join(output_landmark_dir, "label_landmark"), map_size=LMDB_MAP_SIZE)
@@ -89,10 +90,11 @@ def GenerateData(mt):
             bbox = mt.detect(img)
             if bbox is None:
                 continue
+            write_flag = True
             bbox = bbox.astype(np.int32)
             bbox = bbox[:, 0:4]
             for i in bbox:
-                iou = IOU(i, gt_bbox)
+                iou = IOU_lmk(i, gt_bbox)
                 if iou < IOU_PART_THRES:
                     continue
                 r = square_bbox(i)
@@ -107,7 +109,7 @@ def GenerateData(mt):
                 if sx0 < 0 or sy0 < 0 or dx0 < 0 or dy0 < 0 or sx1 > W or sy1 > H or dx1 > size_p or dy1 > size_p:
                     log.warning("img shape is: {},{}".format(img.shape[0], img.shape[1]))
                     continue
-                rotation = [-30, -15, 0, 15, 30] 
+                rotation = [-40, -30, -15, 0, 15, 30, 40]  
                 temp_crop[dy0:dy1, dx0:dx1, :] = img[sy0:sy1, sx0:sx1, :]
                 for theta in rotation:
                     (h_, w_) = temp_crop.shape[:2] 
@@ -158,6 +160,7 @@ def GenerateData(mt):
                         landmarks[i*2+1] = landmarks[i*2+1] / scalor
 
                     if iou > IOU_POS_THRES:
+                        write_flag = False
                         label_list = [xmin, ymin, xmax, ymax] + landmarks + [-1]
                         label = np.array(label_list, dtype=np.float32)
                         txn_landmark_image.put("{}".format(global_idx_landmark).encode("ascii"), out.tostring())
@@ -172,7 +175,9 @@ def GenerateData(mt):
                         txn_landmark_label = env_landmark_label.begin(write=True)
                         inner_landmark_idx = 0
                         log.info("now commit landmark lmdb")
-    
+            if write_flag:
+                not_reg_file.write(filename+'\n')
+
     anno_file = os.path.join(root_dir, "testImageList.txt")
     with open(anno_file, "r") as f:
         inner_landmark_idx = 0
@@ -201,8 +206,9 @@ def GenerateData(mt):
                 continue
             bbox = bbox.astype(np.int32)
             bbox = bbox[:, 0:4]
+            write_flag = True
             for i in bbox:
-                iou = IOU(i, gt_bbox)
+                iou = IOU_lmk(i, gt_bbox)
                 if iou < IOU_PART_THRES:
                     continue
                 r = square_bbox(i)
@@ -217,7 +223,7 @@ def GenerateData(mt):
                 if sx0 < 0 or sy0 < 0 or dx0 < 0 or dy0 < 0 or sx1 > W or sy1 > H or dx1 > size_p or dy1 > size_p:
                     log.warning("img shape is: {},{}".format(img.shape[0], img.shape[1]))
                     continue
-                rotation = [-30, -15, 0, 15, 30] 
+                rotation = [-40, -30, -15, 0, 15, 30, 40] 
                 temp_crop[dy0:dy1, dx0:dx1, :] = img[sy0:sy1, sx0:sx1, :]
                 for theta in rotation:
                     (h_, w_) = temp_crop.shape[:2] 
@@ -268,6 +274,7 @@ def GenerateData(mt):
                         landmarks[i*2+1] = landmarks[i*2+1] / scalor
 
                     if iou > IOU_POS_THRES:
+                        write_flag = False
                         label_list = [xmin, ymin, xmax, ymax] + landmarks + [-1]
                         label = np.array(label_list, dtype=np.float32)
                         txn_landmark_image.put("{}".format(global_idx_landmark).encode("ascii"), out.tostring())
@@ -282,7 +289,9 @@ def GenerateData(mt):
                         txn_landmark_label = env_landmark_label.begin(write=True)
                         inner_landmark_idx = 0
                         log.info("now commit landmark lmdb")
-
+            if write_flag:
+                not_reg_file.write(filename+'\n')
+    not_reg_file.close()        
     log.info("process done!")
     txn_landmark_image.commit()
     txn_landmark_label.commit()
@@ -294,7 +303,7 @@ if __name__ == "__main__":
     os.environ["CUDA_VISIBLE_DEVICES"] = ",".join([str(i) for i in GPU_ID])
     device = torch.device("cuda:0" if torch.cuda.is_available() and USE_CUDA else "cpu")
     # pnet
-    pnet_weight_path = "../models/pnet_20200917_final.pkl"
+    pnet_weight_path = "../models/pnet_20201009_final.pkl"
     pnet = PNet(test=True)
     LoadWeights(pnet_weight_path, pnet)
     pnet.to(device)
@@ -302,7 +311,7 @@ if __name__ == "__main__":
     # rnet
     rnet = None
     if net_type == "ONET":
-        rnet_weight_path = "../models/rnet_20200917_final.pkl"
+        rnet_weight_path = "../models/rnet_20201012_iter_220000.pkl"
         rnet = RNet(test=True)
         LoadWeights(rnet_weight_path, rnet)
         rnet.to(device)
