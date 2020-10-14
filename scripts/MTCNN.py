@@ -14,6 +14,7 @@ SHOW_FIGURE = True
 
 def Image2Tensor(img, MEANS):
     src = img.astype(np.float32) - np.array(MEANS, dtype=np.float32)
+    src = src / 128
     src = src.swapaxes(1, 2).swapaxes(0, 1)
 
     input = torch.from_numpy(src).unsqueeze(0)
@@ -213,8 +214,7 @@ class MTCNN(object):
             crop[dy0:dy1, dx0:dx1, :] = img[sy0:sy1, sx0:sx1, :]
             out = cv2.resize(crop, (IMAGE_SIZE, IMAGE_SIZE))
             out = out.astype(np.float32) - np.array([127.5,127.5,127.5], dtype=np.float32)
-            if IMAGE_SIZE == 48:
-                out = out / 128
+            out = out / 128
             out = out.swapaxes(1, 2).swapaxes(0, 1)
             crops += [out]
             origin_bbox += [i]
@@ -305,28 +305,28 @@ if __name__ == "__main__":
     os.environ["CUDA_VISIBLE_DEVICES"] = ",".join([str(i) for i in GPU_ID])
     device = torch.device("cuda:0" if torch.cuda.is_available() and USE_CUDA else "cpu")
     # pnet
-    pnet_weight_path = "./models/pnet_20200917_final.pkl"
+    pnet_weight_path = "./models/pnet_20201009_final.pkl"
     pnet = PNet(test=True)
     LoadWeights(pnet_weight_path, pnet)
     pnet.to(device)
 
     # rnet
-    rnet_weight_path = "./models/rnet_20200917_final.pkl"
+    rnet_weight_path = "./models/rnet_20201012_final.pkl"
     rnet = RNet(test=True)
     LoadWeights(rnet_weight_path, rnet)
     rnet.to(device)
 
     # onet
-    onet_weight_path = "./models/onet_20200925_dp_3113_adam_final.pkl"
+    onet_weight_path = "./models/onet_20201013_final.pkl"
     onet = ONet(test=True)
     LoadWeights(onet_weight_path, onet)
     onet.to(device)
 
-    mtcnn = MTCNN(detectors=[pnet, rnet, onet], device=device, threshold=[0.6, 0.7, 0.6])
+    mtcnn = MTCNN(detectors=[pnet, rnet, onet], device=device, threshold=[0.6, 0.7, 0.7])
 
     #img_path = "~/dataset/faces3.jpg"
-    #img_path = "~/dataset/WIDER_FACE/WIDER_train/images/14--Traffic/14_Traffic_Traffic_14_545.jpg"
-    img_path = "../img/faces1.jpg"
+    #img_path = "../dataset/LFW_NET_FACE/lfw_5590/Pauline_Phillips_0001.jpg"
+    img_path = "../img/faces2.jpg"
 
     img_path = os.path.expanduser(img_path)
 
@@ -352,7 +352,7 @@ if __name__ == "__main__":
                     cv2.circle(tmp,(x ,y), 3, (0,0,255),-1) 
             plt.imshow(tmp[:, :, ::-1])
             plt.title("result")
-            #cv2.imwrite("../img/res1_lmk.jpg",tmp)
+            cv2.imwrite("../img/res_tiny_face_lmk.jpg",tmp)
         plt.show()
 
     '''
