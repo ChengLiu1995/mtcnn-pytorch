@@ -1,8 +1,8 @@
 # mtcnn-pytorch
 
-![image](./img/res1.jpg)
+![image](./img/res1_lmk.jpg)
 
-![image](./img/res2.jpg)
+![image](./img/res2_lmk.jpg)
 
 #### 介绍
 
